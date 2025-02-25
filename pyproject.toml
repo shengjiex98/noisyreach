@@ -7,8 +7,29 @@ authors = [
     { name = "shengjiex98", email = "shengjiex98@gmail.com" }
 ]
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "verse",
+]
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.uv.sources]
+verse = { git = "https://github.com/shengjiex98/verse-library" }
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+extend-select = [
+    "I"
+]
+
+[tool.ruff.format]
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.1.0",
+    "ruff>=0.9.7",
+]
