@@ -22,7 +22,11 @@ dev = [
 ]
 
 [tool.uv.sources]
-verse = { git = "https://github.com/shengjiex98/verse-library" }
+# verse = { git = "https://github.com/shengjiex98/verse-library" }
+verse = { workspace = true }
+
+[tool.uv.workspace]
+members = ["packages/*"]
 
 [tool.ruff.format]
 docstring-code-format = true
