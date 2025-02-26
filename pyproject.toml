@@ -1,3 +1,7 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "noisyreach"
 version = "0.1.0"
@@ -11,25 +15,19 @@ dependencies = [
     "verse",
 ]
 
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
-[tool.uv.sources]
-verse = { git = "https://github.com/shengjiex98/verse-library" }
-
-[tool.ruff]
-line-length = 100
-
-[tool.ruff.lint]
-extend-select = [
-    "I"
-]
-
-[tool.ruff.format]
-
 [dependency-groups]
 dev = [
     "pre-commit>=4.1.0",
     "ruff>=0.9.7",
+]
+
+[tool.uv.sources]
+verse = { git = "https://github.com/shengjiex98/verse-library" }
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.ruff.lint]
+extend-select = [
+    "I"
 ]
