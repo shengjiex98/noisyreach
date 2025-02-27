@@ -22,7 +22,7 @@ dev = [
 ]
 
 [tool.uv.sources]
-verse = { git = "https://github.com/shengjiex98/verse-library" }
+verse = { git = "https://github.com/shengjiex98/verse-library", rev = "cbad767bf18a56bd4a56665a04a9f6a703d583d6" }
 
 [tool.ruff.format]
 docstring-code-format = true

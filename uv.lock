@@ -588,7 +588,7 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "verse", git = "https://github.com/shengjiex98/verse-library" }]
+requires-dist = [{ name = "verse", git = "https://github.com/shengjiex98/verse-library?rev=cbad767bf18a56bd4a56665a04a9f6a703d583d6" }]
 
 [package.metadata.requires-dev]
 dev = [
@@ -1275,7 +1275,7 @@ wheels = [
 [[package]]
 name = "verse"
 version = "0.1"
-source = { git = "https://github.com/shengjiex98/verse-library#cbad767bf18a56bd4a56665a04a9f6a703d583d6" }
+source = { git = "https://github.com/shengjiex98/verse-library?rev=cbad767bf18a56bd4a56665a04a9f6a703d583d6#cbad767bf18a56bd4a56665a04a9f6a703d583d6" }
 dependencies = [
     { name = "astunparse" },
     { name = "beautifulsoup4" },
