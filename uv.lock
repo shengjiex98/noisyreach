@@ -627,7 +627,7 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "verse", virtual = "packages/verse-library" }]
+requires-dist = [{ name = "verse", editable = "packages/verse-library" }]
 
 [package.metadata.requires-dev]
 dev = [
@@ -1323,7 +1323,7 @@ wheels = [
 [[package]]
 name = "verse"
 version = "0.1.0"
-source = { virtual = "packages/verse-library" }
+source = { editable = "packages/verse-library" }
 dependencies = [
     { name = "astunparse" },
     { name = "beautifulsoup4" },
