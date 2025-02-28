@@ -25,11 +25,11 @@ class CarAgent(BaseAgent):
         control_period: float = 0.02,
     ):
         super().__init__(id, code, file_name, initial_state, initial_mode)
-        self.control_period = control_period
         self.max_speed = max_speed
         self.max_accel = max_accel
         self.max_omega = max_omega
         self.max_alpha = max_alpha
+        self.control_period = control_period
 
     def dynamics(self, t, state, u):
         assert len(state) == 5
@@ -122,7 +122,7 @@ class CarAgent(BaseAgent):
         t = np.arange(0, time_horizon + time_step, time_step)
         n_points = t.shape[0]
 
-        # All theoretical control instants. In practice, these will be performed at the first timestamp greater or equal to the control instants.
+        # All theoretical control instants.
         control_instants = np.arange(
             0, t[-1] + self.control_period, self.control_period
         )
@@ -130,7 +130,6 @@ class CarAgent(BaseAgent):
         # Find indecies of timestamps where the practical calculations of control inputs should occur
         control_indices = np.searchsorted(t, control_instants, "left")
 
-        # Dimension: n_points, (timestamp + states)
         trace = np.zeros((n_points, len(initial_set) + 1))
         trace[:, 0] = t
 
@@ -151,6 +150,33 @@ class CarAgent(BaseAgent):
         return trace
 
 
+def plot_reference_trace(fig: go.Figure, reference_trace: np.ndarray):
+    # Create arrows for reference trajectory
+    for i in range(
+        0, len(reference_trace), 200
+    ):  # Plot every 200th point to avoid overcrowding
+        t, x, y, theta, v, omega = reference_trace[i, :]
+        fig.add_trace(
+            go.Scatter(
+                x=[x],
+                y=[y],
+                mode="markers",
+                marker=dict(
+                    size=20 * v,
+                    symbol="arrow",
+                    angle=-theta / np.pi * 180 + 90,
+                    color="green",
+                    line=dict(width=2, color="DarkSlateGrey"),
+                ),
+                showlegend=True if i == 0 else False,
+                name="Reference",
+                hovertext=f"t={t:.2f}, x={x:.2f}, y={y:.2f}",
+                hoverinfo="text",
+            )
+        )
+    return fig
+
+
 if __name__ == "__main__":
     time_horizon = 9.8
     time_step = 0.001
@@ -161,8 +187,8 @@ if __name__ == "__main__":
     initial_set_e = [0.0] * 5
 
     dubins_car = Scenario(ScenarioConfig(parallel=False))
-    CAR_CONTROLLER = os.path.join(os.path.dirname(__file__), "decision_logic.py")
-    car1 = CarAgent("car1", file_name=CAR_CONTROLLER)
+    CAR_DL = os.path.join(os.path.dirname(__file__), "decision_logic.py")
+    car1 = CarAgent("car1", file_name=CAR_DL)
     dubins_car.add_agent(car1)
     dubins_car.set_init(
         # Continuous states
@@ -182,31 +208,11 @@ if __name__ == "__main__":
             for t in np.arange(0, time_horizon + time_step, time_step)
         ]
     )
-    traces = dubins_car.simulate_multi(9.8, 0.001, max_height=6)
+    traces = dubins_car.simulate_multi(time_horizon, time_step, max_height=6)
 
     fig = go.Figure()
-    simulation_tree(traces[0], None, fig, 1, 2, [1, 2], "fill", "trace")
-    # Create arrows for reference trajectory
-    arrow_length = 0.02  # Length of arrow
-    for i in range(
-        0, len(reference_trace), 200
-    ):  # Plot every 200th point to avoid overcrowding
-        x, y, theta, v, omega = reference_trace[i, 1:]
-        fig.add_trace(
-            go.Scatter(
-                x=[x],
-                y=[y],
-                mode="markers",
-                marker=dict(
-                    size=12 * v,
-                    symbol="arrow",
-                    angle=-theta / np.pi * 180 + 90,
-                    color="black",
-                ),
-                showlegend=True if i == 0 else False,
-                name="Reference",
-            )
-        )
+    simulation_tree(traces[0], None, fig, 1, 2, [0, 1, 2], "fill", "trace")
+    plot_reference_trace(fig, reference_trace)
     # for trace in traces:
     #     simulation_tree(trace, None, fig, 1, 2, [1, 2], "fill", "trace")
     fig.show()
