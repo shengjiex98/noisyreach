@@ -92,7 +92,9 @@ class CarAgent(BaseAgent):
 
         x, y, theta = state[:3]
         x_r, y_r, theta_r, v_r, omega_r = reference_posture + reference_velocities
-        x_e, y_e, theta_e = x_r - x, y_r - y, theta_r - theta
+        x_e = np.cos(theta) * (x_r - x) + np.sin(theta) * (y_r - y)
+        y_e = -np.sin(theta) * (x_r - x) + np.cos(theta) * (y_r - y)
+        theta_e = theta_r - theta
 
         Kx = 10  # 1/sec
         Ky = 64  # 1/m^2
