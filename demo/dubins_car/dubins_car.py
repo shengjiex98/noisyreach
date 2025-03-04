@@ -1,12 +1,17 @@
 import os
+import sys
 from decimal import Decimal
+from pathlib import Path
 
 import numpy as np
-from decision_logic import CarMode
 from scipy.integrate import solve_ivp
 from verse import BaseAgent, Scenario, ScenarioConfig
 from verse.map import LaneMap
 from verse.plotter.plotter2D import go, simulation_tree
+
+sys.path.append(str(Path(__file__).parent))
+print(sys.path)
+from decision_logic import CarMode  # noqa: E402
 
 
 class CarAgent(BaseAgent):
@@ -184,7 +189,7 @@ if __name__ == "__main__":
     # center and error for: x, y, theta, v, omega
     initial_set_c = (1.0, 0.0, np.pi / 2, 0.0, 0.0)
     # initial_set_e = (0.1, 0.1, np.pi / 10, 0.1, np.pi / 50)
-    initial_set_e = [0.0] * 5
+    initial_set_e = [0.1] * 5
 
     dubins_car = Scenario(ScenarioConfig(parallel=False))
     CAR_DL = os.path.join(os.path.dirname(__file__), "decision_logic.py")
@@ -211,8 +216,8 @@ if __name__ == "__main__":
     traces = dubins_car.simulate_multi(time_horizon, time_step, max_height=6)
 
     fig = go.Figure()
-    simulation_tree(traces[0], None, fig, 1, 2, [0, 1, 2], "fill", "trace")
+    # simulation_tree(traces[0], None, fig, 1, 2, [0, 1, 2], "fill", "trace")
+    for trace in traces:
+        simulation_tree(trace, None, fig, 1, 2, [1, 2], "fill", "trace")
     plot_reference_trace(fig, reference_trace)
-    # for trace in traces:
-    #     simulation_tree(trace, None, fig, 1, 2, [1, 2], "fill", "trace")
     fig.show()
