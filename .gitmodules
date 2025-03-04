@@ -1,0 +1,3 @@
+[submodule "packages/verse-library"]
+	path = packages/verse-library
+	url = https://github.com/shengjiex98/verse-library.git
