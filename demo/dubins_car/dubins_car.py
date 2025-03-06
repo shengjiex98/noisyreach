@@ -53,23 +53,49 @@ class CarAgent(BaseAgent):
 
         return [x_dot, y_dot, theta_dot, v_dot, omega_dot]
 
-    @staticmethod
-    def reference_posture(t) -> list[float]:
-        theta_r = np.pi / 10 * t + np.pi / 2
-        return [np.cos(theta_r - np.pi / 2), np.sin(theta_r - np.pi / 2), theta_r]
-
-    @staticmethod
-    def reference_velocities(t) -> list[float]:
-        return [np.pi / 10, np.pi / 10]
-
-    @staticmethod
-    def reference_trace(time_horizon: float, time_step: float) -> np.ndarray:
-        return np.asarray(
-            [
-                [t] + CarAgent.reference_posture(t) + CarAgent.reference_velocities(t)
-                for t in np.arange(0, time_horizon + time_step, time_step)
-            ]
+    def TC_simulate(
+        self,
+        mode: str,
+        initial_set: list[float],
+        time_horizon: float,
+        time_step: float,
+        map: LaneMap = None,
+    ):
+        # TODO: currently only using Decimal for assert, not integration. Consider using Decimals also for calculation, or other ways to help with precision/rounding errors.
+        assert Decimal(str(self.control_period)) % Decimal(str(time_step)) == 0, (
+            f"control_period must be multiples of simulation's time_step. Got {self.control_period, time_step}"
         )
+
+        # All timestamps to simulate
+        t = np.arange(0, time_horizon + time_step, time_step)
+        n_points = t.shape[0]
+
+        # All theoretical control instants.
+        control_instants = np.arange(
+            0, t[-1] + self.control_period, self.control_period
+        )
+
+        # Find indecies of timestamps where the practical calculations of control inputs should occur
+        control_indices = np.searchsorted(t, control_instants, "left")
+
+        trace = np.zeros((n_points, len(initial_set) + 1))
+        trace[:, 0] = t
+
+        # Each control period is solved as a separate IVP problem with the states from last period as the initial value, and control input calculated from this initial value
+        state = initial_set
+        for i_start, i_end in zip(control_indices[:-1], control_indices[1:]):
+            u = CarAgent.tracking_controller(t[i_start], state)
+            y = solve_ivp(
+                self.dynamics,
+                (t[i_start], t[i_end]),
+                state,
+                t_eval=t[i_start : i_end + 1],
+                args=(u,),
+            ).y
+            trace[i_start : i_end + 1, 1:] = y.T
+            state = y[:, -1]
+
+        return trace
 
     @staticmethod
     def tracking_controller(
@@ -119,49 +145,23 @@ class CarAgent(BaseAgent):
 
         return v_t, omega_t
 
-    def TC_simulate(
-        self,
-        mode: str,
-        initial_set: list[float],
-        time_horizon: float,
-        time_step: float,
-        map: LaneMap = None,
-    ):
-        # TODO: currently only using Decimal for assert, not integration. Consider using Decimals also for calculation, or other ways to help with precision/rounding errors.
-        assert Decimal(str(self.control_period)) % Decimal(str(time_step)) == 0, (
-            f"control_period must be multiples of simulation's time_step. Got {self.control_period, time_step}"
+    @staticmethod
+    def reference_posture(t) -> list[float]:
+        theta_r = np.pi / 10 * t + np.pi / 2
+        return [np.cos(theta_r - np.pi / 2), np.sin(theta_r - np.pi / 2), theta_r]
+
+    @staticmethod
+    def reference_velocities(t) -> list[float]:
+        return [np.pi / 10, np.pi / 10]
+
+    @staticmethod
+    def reference_trace(time_horizon: float, time_step: float) -> np.ndarray:
+        return np.asarray(
+            [
+                [t] + CarAgent.reference_posture(t) + CarAgent.reference_velocities(t)
+                for t in np.arange(0, time_horizon + time_step, time_step)
+            ]
         )
-
-        # All timestamps to simulate
-        t = np.arange(0, time_horizon + time_step, time_step)
-        n_points = t.shape[0]
-
-        # All theoretical control instants.
-        control_instants = np.arange(
-            0, t[-1] + self.control_period, self.control_period
-        )
-
-        # Find indecies of timestamps where the practical calculations of control inputs should occur
-        control_indices = np.searchsorted(t, control_instants, "left")
-
-        trace = np.zeros((n_points, len(initial_set) + 1))
-        trace[:, 0] = t
-
-        # Each control period is solved as a separate IVP problem with the states from last period as the initial value, and control input calculated from this initial value
-        state = initial_set
-        for i_start, i_end in zip(control_indices[:-1], control_indices[1:]):
-            u = CarAgent.tracking_controller(t[i_start], state)
-            y = solve_ivp(
-                self.dynamics,
-                (t[i_start], t[i_end]),
-                state,
-                t_eval=t[i_start : i_end + 1],
-                args=(u,),
-            ).y
-            trace[i_start : i_end + 1, 1:] = y.T
-            state = y[:, -1]
-
-        return trace
 
     @staticmethod
     def plot_reference_trace(
