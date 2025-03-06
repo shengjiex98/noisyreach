@@ -54,13 +54,22 @@ class CarAgent(BaseAgent):
         return [x_dot, y_dot, theta_dot, v_dot, omega_dot]
 
     @staticmethod
-    def reference_posture(t):
+    def reference_posture(t) -> list[float]:
         theta_r = np.pi / 10 * t + np.pi / 2
         return [np.cos(theta_r - np.pi / 2), np.sin(theta_r - np.pi / 2), theta_r]
 
     @staticmethod
-    def reference_velocities(t):
+    def reference_velocities(t) -> list[float]:
         return [np.pi / 10, np.pi / 10]
+
+    @staticmethod
+    def reference_trace(time_horizon: float, time_step: float) -> np.ndarray:
+        return np.asarray(
+            [
+                [t] + CarAgent.reference_posture(t) + CarAgent.reference_velocities(t)
+                for t in np.arange(0, time_horizon + time_step, time_step)
+            ]
+        )
 
     @staticmethod
     def tracking_controller(
@@ -154,46 +163,52 @@ class CarAgent(BaseAgent):
 
         return trace
 
+    @staticmethod
+    def plot_reference_trace(
+        fig: go.Figure, time_horizon: float, time_step: float, max_n_points: int = 50
+    ):
+        reference_trace = CarAgent.reference_trace(time_horizon, time_step)
+        n = reference_trace.shape[0]
 
-def plot_reference_trace(fig: go.Figure, reference_trace: np.ndarray):
-    # Create arrows for reference trajectory
-    for i in range(
-        0, len(reference_trace), 200
-    ):  # Plot every 200th point to avoid overcrowding
-        t, x, y, theta, v, omega = reference_trace[i, :]
-        fig.add_trace(
-            go.Scatter(
-                x=[x],
-                y=[y],
-                mode="markers",
-                marker=dict(
-                    size=20 * v,
-                    symbol="arrow",
-                    angle=-theta / np.pi * 180 + 90,
-                    color="green",
-                    line=dict(width=2, color="DarkSlateGrey"),
-                ),
-                showlegend=True if i == 0 else False,
-                name="Reference",
-                hovertext=f"t={t:.2f}, x={x:.2f}, y={y:.2f}",
-                hoverinfo="text",
+        # Plot at most max_n_points to avoid overcrowding
+        for i in range(0, n, (n - 1) // (max_n_points - 1)):
+            t, x, y, theta, v, omega = reference_trace[i, :]
+            fig.add_trace(
+                go.Scatter(
+                    x=[x],
+                    y=[y],
+                    mode="markers",
+                    marker=dict(
+                        size=20 * v,
+                        symbol="arrow",
+                        angle=-theta / np.pi * 180 + 90,
+                        color="green",
+                        line=dict(width=2, color="DarkSlateGrey"),
+                    ),
+                    showlegend=True if i == 0 else False,
+                    name="Reference",
+                    hovertext=f"t={t:.2f}, x={x:.2f}, y={y:.2f}",
+                    hoverinfo="text",
+                )
             )
-        )
-    return fig
+        return fig
 
 
 if __name__ == "__main__":
+    # >>>>>>>>> Simulation Parameters >>>>>>>>>
     time_horizon = 9.8
     time_step = 0.001
 
-    # center and error for: x, y, theta, v, omega
+    # center and error for initial_set =[x, y, theta, v, omega]
     initial_set_c = (1.0, 0.0, np.pi / 2, 0.0, 0.0)
-    # initial_set_e = (0.1, 0.1, np.pi / 10, 0.1, np.pi / 50)
-    initial_set_e = [0.1] * 5
+    initial_set_e = (0.1,) * 5
+    # <<<<<<<<< Simulation Parameters <<<<<<<<<
 
-    dubins_car = Scenario(ScenarioConfig(parallel=False))
+    # File containing decision logic
     CAR_DL = os.path.join(os.path.dirname(__file__), "decision_logic.py")
+
     car1 = CarAgent("car1", file_name=CAR_DL)
+    dubins_car = Scenario(ScenarioConfig(parallel=False))
     dubins_car.add_agent(car1)
     dubins_car.set_init(
         # Continuous states
@@ -207,17 +222,11 @@ if __name__ == "__main__":
         [(CarMode.NORMAL,)],
     )
 
-    reference_trace = np.asarray(
-        [
-            [t] + CarAgent.reference_posture(t) + CarAgent.reference_velocities(t)
-            for t in np.arange(0, time_horizon + time_step, time_step)
-        ]
-    )
     traces = dubins_car.simulate_multi(time_horizon, time_step, max_height=6)
 
     fig = go.Figure()
     # simulation_tree(traces[0], None, fig, 1, 2, [0, 1, 2], "fill", "trace")
     for trace in traces:
         simulation_tree(trace, None, fig, 1, 2, [1, 2], "fill", "trace")
-    plot_reference_trace(fig, reference_trace)
+    CarAgent.plot_reference_trace(fig, time_horizon, time_step)
     fig.show()
