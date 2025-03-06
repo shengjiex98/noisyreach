@@ -28,6 +28,7 @@ class CarAgent(BaseAgent):
         max_omega: float = 0.8,
         max_alpha: float = 5,
         control_period: float = 0.02,
+        sensing_error_std: list[float] = [0] * 5,
     ):
         super().__init__(id, code, file_name, initial_state, initial_mode)
         self.max_speed = max_speed
@@ -35,6 +36,11 @@ class CarAgent(BaseAgent):
         self.max_omega = max_omega
         self.max_alpha = max_alpha
         self.control_period = control_period
+        self.sensing_error_std = sensing_error_std
+
+    def sensor(self, state):
+        error = np.random.normal(0, self.sensing_error_std)
+        return (1 + error) * state
 
     def dynamics(self, t, state, u):
         assert len(state) == 5
@@ -84,7 +90,7 @@ class CarAgent(BaseAgent):
         # Each control period is solved as a separate IVP problem with the states from last period as the initial value, and control input calculated from this initial value
         state = initial_set
         for i_start, i_end in zip(control_indices[:-1], control_indices[1:]):
-            u = CarAgent.tracking_controller(t[i_start], state)
+            u = CarAgent.tracking_controller(t[i_start], self.sensor(state))
             y = solve_ivp(
                 self.dynamics,
                 (t[i_start], t[i_end]),
@@ -207,7 +213,8 @@ if __name__ == "__main__":
     # File containing decision logic
     CAR_DL = os.path.join(os.path.dirname(__file__), "decision_logic.py")
 
-    car1 = CarAgent("car1", file_name=CAR_DL)
+    # Sensing errors only in x and y
+    car1 = CarAgent("car1", file_name=CAR_DL, sensing_error_std=[0.4] * 2 + [0] * 3)
     dubins_car = Scenario(ScenarioConfig(parallel=False))
     dubins_car.add_agent(car1)
     dubins_car.set_init(
