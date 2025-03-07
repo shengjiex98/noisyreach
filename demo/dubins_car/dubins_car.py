@@ -78,7 +78,7 @@ class CarAgent(BaseAgent):
 
         # All theoretical control instants.
         control_instants = np.arange(
-            0, t[-1] + self.control_period, self.control_period
+            0, t[-1], self.control_period
         )
 
         # Find indecies of timestamps where the practical calculations of control inputs should occur
