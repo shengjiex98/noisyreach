@@ -77,9 +77,7 @@ class CarAgent(BaseAgent):
         n_points = t.shape[0]
 
         # All theoretical control instants.
-        control_instants = np.arange(
-            0, t[-1], self.control_period
-        )
+        control_instants = np.arange(0, t[-1] + self.control_period / 2, self.control_period)
 
         # Find indecies of timestamps where the practical calculations of control inputs should occur
         control_indices = np.searchsorted(t, control_instants, "left")
