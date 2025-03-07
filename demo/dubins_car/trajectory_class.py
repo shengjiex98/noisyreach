@@ -15,6 +15,32 @@ class Trajectory:
         # No cumulative times or optimized segments are stored.
         self.reset()
 
+    @property
+    def total_duration(self) -> float:
+        return sum([spec[1] for spec in self.traj_specs])
+
+    def reset(self) -> None:
+        """
+        Resets the internal state so that lower t values can be used again.
+        """
+        self.last_t = -math.inf
+        self._gen = self._state_generator()
+        next(self._gen)  # Prime the generator
+
+    def get_state(self, t) -> tuple[tuple[float], tuple[float]]:
+        """
+        Sends a strictly increasing time t to the state generator and returns the state:
+            ((x, y, theta), (v, omega))
+        """
+        if t is None:
+            return None
+        if t < self.last_t:
+            self.reset()
+            raise Warning(
+                "Passing a t value that is smaller than the previous t value is inefficient. Consider calling `get_state()` with non-decreasing t values. Use `reset()` to start from t=0."
+            )
+        return self._gen.send(t)
+
     def _state_generator(self):
         """
         A generator that expects strictly increasing time values.
@@ -22,122 +48,99 @@ class Trajectory:
         Maintains only the current segment and its start time.
         Yields a tuple ((x, y, theta), (v, omega)) for each received time t.
         """
-        last_t = -float("inf")
-        current_segment = 0
-        current_seg_start = 0.0  # Global time when the current segment starts
+        current_seg_start = 0.0
 
         # Prime the generator: wait for the first time value.
         t = yield
 
-        # Process each segment in order.
-        while current_segment < len(self.traj_specs):
-            spec = self.traj_specs[current_segment]
-            duration = spec[1]
-            seg_end = current_seg_start + duration
+        for spec in self.traj_specs:
+            # Skip unused segments
+            seg_end = current_seg_start + spec[1]
+            if t > seg_end + self.tol:
+                current_seg_start = seg_end
+                continue
 
-            # Compute any per-segment constants on the fly.
-            if spec[0] == "line":
-                (x0, y0) = spec[2]
-                (x1, y1) = spec[3]
-                vx = (x1 - x0) / duration
-                vy = (y1 - y0) / duration
-                theta = math.atan2(vy, vx)
-                v = math.hypot(vx, vy)
-                omega = 0.0
+            posture_f, velocity_f = Trajectory._get_state_functions(spec)
 
-                def posture(t):
-                    return (x0 + vx * t, y0 + vy * t, theta)
-
-                def velocity(t):
-                    return (v, omega)
-            elif spec[0] == "circle":
-                (x0, y0) = spec[2]
-                (x1, y1) = spec[3]
-                (xc, yc) = spec[4]
-                direction = spec[5]
-                phi_start = math.atan2(y0 - yc, x0 - xc)
-                phi_end = math.atan2(y1 - yc, x1 - xc)
-                dphi = phi_end - phi_start
-                if direction == "counterclockwise":
-                    if dphi < 0:
-                        dphi += 2 * math.pi
-                elif direction == "clockwise":
-                    if dphi > 0:
-                        dphi -= 2 * math.pi
-                else:
-                    raise ValueError(
-                        "Invalid circle direction: must be 'clockwise' or 'counterclockwise'"
-                    )
-                R = math.hypot(x0 - xc, y0 - yc)
-
-                def posture(t):
-                    phi = phi_start + (t / duration) * dphi
-                    return (
-                        xc + R * math.cos(phi),
-                        yc + R * math.sin(phi),
-                        phi
-                        + (
-                            math.pi / 2
-                            if direction == "counterclockwise"
-                            else -math.pi / 2
-                        ),
-                    )
-
-                omega = dphi / duration
-                v = omega * R
-
-                def velocity(t):
-                    return (v, omega)
-            else:
-                raise ValueError("Unknown spec type: " + spec[0])
-
-            # Process times that fall into the current segment.
             while True:
-                if t is None:
-                    t = yield None  # Wait if no time is provided
-
-                # Enforce strictly increasing time.
-                if t <= last_t:
-                    raise ValueError(
-                        f"Time t must be strictly increasing. Received t = {t} but last t was {last_t}."
-                    )
-
                 # If t has advanced beyond this segment, break to process next segment.
-                if (
-                    t > seg_end + self.tol
-                    or abs(t - seg_end) < self.tol
-                    and current_segment < len(self.traj_specs) - 1
-                ):
+                if t > seg_end + self.tol:
+                    current_seg_start = seg_end
                     break
 
-                relative_t = t - current_seg_start
-                last_t = t
+                t_relative = t - current_seg_start
 
                 # Yield the state and wait for the next t
-                t = yield posture(relative_t), velocity(relative_t)
-
-            # t is now past the current segment; move on.
-            current_segment += 1
-            current_seg_start = seg_end
+                t = yield posture_f(t_relative), velocity_f(t_relative)
 
         # If we run out of segments, any further t values are out of bounds.
         while True:
             t = yield None
             raise ValueError("Time t exceeds the trajectory duration.")
 
-    def get_state(self, t):
-        """
-        Sends a strictly increasing time t to the state generator and returns the state:
-            ((x, y, theta), (v, omega))
-        """
-        return self._gen.send(t)
+    @staticmethod
+    def _get_state_functions(spec):
+        if spec[0] == "line":
+            return Trajectory._line_f(spec)
+        elif spec[0] == "circle":
+            return Trajectory._circle_f(spec)
+        else:
+            raise NotImplementedError("Segment spec passed is not implemented.")
 
-    def reset(self):
-        """
-        Resets the internal state so that lower t values can be used again.
-        """
-        self._gen = self._state_generator()
-        next(self._gen)  # Prime the generator
+    @staticmethod
+    def _line_f(spec):
+        duration = spec[1]
+        (x0, y0) = spec[2]
+        (x1, y1) = spec[3]
+        vx = (x1 - x0) / duration
+        vy = (y1 - y0) / duration
+        theta = math.atan2(vy, vx)
+        v = math.hypot(vx, vy)
+        omega = 0.0
+
+        def posture_f(t):
+            return (x0 + vx * t, y0 + vy * t, theta)
+
+        def velocity_f(t):
+            return (v, omega)
+
+        return posture_f, velocity_f
+
+    @staticmethod
+    def _circle_f(spec):
+        direction = spec[5]
+        if direction not in ["clockwise", "counterclockwise"]:
+            raise ValueError(
+                "Invalid circle direction: must be 'clockwise' or 'counterclockwise'"
+            )
+        duration = spec[1]
+        (x0, y0) = spec[2]
+        (x1, y1) = spec[3]
+        (xc, yc) = spec[4]
+        phi_start = math.atan2(y0 - yc, x0 - xc)
+        phi_end = math.atan2(y1 - yc, x1 - xc)
+        dphi = phi_end - phi_start
+        if direction == "counterclockwise" and dphi < 0:
+            dphi += 2 * math.pi
+        elif direction == "clockwise" and dphi > 0:
+            dphi -= 2 * math.pi
+        R = math.hypot(x0 - xc, y0 - yc)
+        omega = dphi / duration
+        v = omega * R
+
+        def posture_f(t):
+            phi = phi_start + (t / duration) * dphi
+            return (
+                xc + R * math.cos(phi),
+                yc + R * math.sin(phi),
+                phi
+                + (math.pi / 2 if direction == "counterclockwise" else -math.pi / 2),
+            )
+
+        def velocity_f(t):
+            return (v, omega)
+
+        return posture_f, velocity_f
 
 
 # --- Example Usage ---
