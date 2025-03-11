@@ -199,22 +199,25 @@ class CarAgent(BaseAgent):
 if __name__ == "__main__":
     # >>>>>>>>> Simulation Parameters >>>>>>>>>
     time_step = 0.001
+    control_period = 0.1
 
     # center and error for initial_set =[x, y, theta, v, omega]
-    initial_set_c = (1.0, 0.0, np.pi / 2, 0.0, 0.0)
-    initial_set_e = (0.1,) * 5
+    initial_set_c = (2.0, -1.0, 0, 0.0, 0.0)
+    initial_set_e = (0.2,) * 2 + (0.2,) * 3
 
-    sensing_errors = [0.0] * 2 + [0, 0, 0]
+    accuracy = 0.8
+    sensing_errors = [1 - accuracy] * 2 + [0.0, 0.0, 0.0]
 
     traj = Trajectory(
         [
-            ("circle", 10, (1, 0), (-1, 0), (0, 0), "counterclockwise"),
-            ("line", 5, (-1, 0), (0, 0)),
-            ("circle", 20, (0, 0), (2, 0), (1, 0), "counterclockwise"),
-            # ("circle", 5, (2, 0), (1, 0), (1.5, 0), "counterclockwise")
+            ("circle", 15, (2, -1), (2, 1), (2, 0), "counterclockwise"),
+            ("line", 15, (2, 1), (-2, 1)),
+            ("circle", 15, (-2, 1), (-2, -1), (-2, 0), "counterclockwise"),
+            ("line", 15, (-2, -1), (2, -1)),
         ]
     )
     time_horizon = traj.total_duration
+    n_simulations = 10
     # <<<<<<<<< Simulation Parameters <<<<<<<<<
 
     # File containing decision logic
@@ -224,6 +227,7 @@ if __name__ == "__main__":
         "car1",
         file_name=CAR_DL,
         # Sensing errors only in x and y
+        control_period=control_period,
         sensing_error_std=sensing_errors,
         traj=traj,
     )
@@ -241,11 +245,14 @@ if __name__ == "__main__":
         [(CarMode.NORMAL,)],
     )
 
-    traces = dubins_car.simulate_multi(time_horizon, time_step, max_height=6, n_sims=1)
+    traces = dubins_car.simulate_multi(
+        time_horizon, time_step, max_height=6, n_sims=n_simulations
+    )
 
     fig = go.Figure()
     # simulation_tree(traces[0], None, fig, 1, 2, [0, 1, 2], "fill", "trace")
     for trace in traces:
         simulation_tree(trace, None, fig, 1, 2, [1, 2], "fill", "trace")
     car1.plot_reference_trace(fig, n_points=70)
+    fig.update_layout(title=f"T={car1.control_period:.3f} Acc={accuracy:.2f}")
     fig.show()
