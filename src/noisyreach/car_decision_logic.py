@@ -1,4 +1,5 @@
 import copy
+from dataclasses import dataclass
 from enum import Enum, auto
 
 
@@ -6,6 +7,7 @@ class CarMode(Enum):
     NORMAL = auto()
 
 
+@dataclass
 class State:
     x: float
     y: float
