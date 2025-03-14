@@ -6,7 +6,7 @@ from verse.plotter.plotter2D import simulation_tree
 
 from noisyreach import CarAgent, CarMode, Trajectory
 
-AVAIL_SYSTEMS = {"CAR": {"dim": 5, "desc": "Dimensions are: (x, y, theta, v, omega)."}}
+AVAIL_SYSTEMS = {"CAR": {"dims": 5, "desc": "Dimensions are: (x, y, theta, v, omega)."}}
 
 
 def trace_deviation(traces: list[AnalysisTree], agent: CarAgent):
