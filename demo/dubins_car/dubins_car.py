@@ -25,7 +25,7 @@ if __name__ == "__main__":
         ]
     )
     time_horizon = traj.total_duration
-    n_simulations = 10
+    num_sims = 10
     # <<<<<<<<< Simulation Parameters <<<<<<<<<
 
     car1 = CarAgent(
@@ -50,7 +50,7 @@ if __name__ == "__main__":
     )
 
     traces = dubins_car.simulate_multi(
-        time_horizon, time_step, max_height=6, n_sims=n_simulations
+        time_horizon, time_step, max_height=6, num_sims=num_sims
     )
 
     fig = go.Figure()
