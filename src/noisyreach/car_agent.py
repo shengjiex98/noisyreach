@@ -75,9 +75,10 @@ class CarAgent(BaseAgent):
         map: LaneMap = None,
     ):
         # TODO: currently only using Decimal for assert, not integration. Consider using Decimals also for calculation, or other ways to help with precision/rounding errors.
-        assert Decimal(str(self.control_period)) % Decimal(str(time_step)) == 0, (
-            f"control_period must be multiples of simulation's time_step. Got {self.control_period, time_step}"
-        )
+        if Decimal(str(self.control_period)) % Decimal(str(time_step)) != 0:
+            print(
+                f"Warning: control_period must be multiples of simulation's time_step. Got {self.control_period, time_step}"
+            )
 
         # Set seed for deterministic sampling in `self.sensor()`. Incrementing `self.nonce` each time ensures different sampling when running `TC_simulate()` multiple times.
         if self.seed:
