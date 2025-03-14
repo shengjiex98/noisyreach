@@ -91,9 +91,9 @@ class CarAgent(BaseAgent):
         n_points = t_eval.shape[0]
 
         # All theoretical control instants.
-        # NOTE: control_instants SHOULD include the last poing in t_eval due to the way they are iterated in the for-loop below.
-        control_instants = np.arange(
-            0, t_eval[-1] + self.control_period / 2, self.control_period
+        # NOTE: control_instants SHOULD include the last point in t_eval due to the way they are iterated in the for-loop below.
+        control_instants = np.append(
+            np.arange(0, t_eval[-1], self.control_period), [t_eval[-1]]
         )
 
         # Find indecies of timestamps where the practical calculations of control inputs should occur
