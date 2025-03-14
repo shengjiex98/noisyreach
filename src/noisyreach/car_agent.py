@@ -21,6 +21,7 @@ class CarAgent(BaseAgent):
         file_name=CAR_DL,
         initial_state=None,
         initial_mode=None,
+        seed=None,
         # Numeric values taken from [1] Y. Kanayama, Y. Kimura, F. Miyazaki, and T. Noguchi, “A stable tracking control method for an autonomous mobile robot,” in Proceedings., IEEE International Conference on Robotics and Automation, Cincinnati, OH, USA: IEEE Comput. Soc. Press, 1990, pp. 384–389. doi: 10.1109/ROBOT.1990.126006.
         max_speed: float = 0.4,
         max_accel: float = 0.5,
@@ -33,6 +34,9 @@ class CarAgent(BaseAgent):
         ),
     ):
         super().__init__(id, code, file_name, initial_state, initial_mode)
+        self.seed = seed
+        self.nonce = 0
+        self.rng = None
         self.max_speed = max_speed
         self.max_accel = max_accel
         self.max_omega = max_omega
@@ -42,7 +46,7 @@ class CarAgent(BaseAgent):
         self.traj = traj
 
     def sensor(self, state):
-        error = np.random.normal(0, self.sensing_error_std)
+        error = self.rng.normal(0, self.sensing_error_std)
         return (1 + error) * state
 
     def dynamics(self, t, state, u):
@@ -74,6 +78,13 @@ class CarAgent(BaseAgent):
         assert Decimal(str(self.control_period)) % Decimal(str(time_step)) == 0, (
             f"control_period must be multiples of simulation's time_step. Got {self.control_period, time_step}"
         )
+
+        # Set seed for deterministic sampling in `self.sensor()`. Incrementing `self.nonce` each time ensures different sampling when running `TC_simulate()` multiple times.
+        if self.seed:
+            self.rng = np.random.default_rng(self.seed + self.nonce)
+            self.nonce += 1
+        else:
+            self.rng = np.random.default_rng()
 
         # All timestamps to simulate
         t_eval = np.arange(0, time_horizon + time_step, time_step)
