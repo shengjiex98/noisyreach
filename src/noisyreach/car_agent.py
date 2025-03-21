@@ -36,7 +36,6 @@ class CarAgent(BaseAgent):
         super().__init__(id, code, file_name, initial_state, initial_mode)
         self.seed = seed
         self.nonce = 0
-        self.rng = None
         self.max_speed = max_speed
         self.max_accel = max_accel
         self.max_omega = max_omega
@@ -45,8 +44,8 @@ class CarAgent(BaseAgent):
         self.sensing_error_std = sensing_error_std
         self.traj = traj
 
-    def sensor(self, state):
-        error = self.rng.normal(0, self.sensing_error_std)
+    def sensor(self, state, rng):
+        error = rng.normal(0, self.sensing_error_std)
         return (1 + error) * state
 
     def dynamics(self, t, state, u):
@@ -82,10 +81,10 @@ class CarAgent(BaseAgent):
 
         # Set seed for deterministic sampling in `self.sensor()`. Incrementing `self.nonce` each time ensures different sampling when running `TC_simulate()` multiple times.
         if self.seed:
-            self.rng = np.random.default_rng(self.seed + self.nonce)
+            rng = np.random.default_rng(self.seed + self.nonce)
             self.nonce += 1
         else:
-            self.rng = np.random.default_rng()
+            rng = np.random.default_rng()
 
         # All timestamps to simulate
         t_eval = np.arange(0, time_horizon + time_step, time_step)
@@ -109,7 +108,7 @@ class CarAgent(BaseAgent):
         for i_start, i_end in zip(control_indices[:-1], control_indices[1:]):
             pr, vr = self.traj.get_state(t_eval[i_start])
             u = CarAgent.tracking_controller(
-                t_eval[i_start], self.sensor(state), pr, vr
+                t_eval[i_start], self.sensor(state, rng), pr, vr
             )
             y = solve_ivp(
                 self.dynamics,
