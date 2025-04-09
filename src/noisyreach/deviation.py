@@ -4,9 +4,17 @@ from verse import Scenario, ScenarioConfig
 from verse.analysis import AnalysisTree
 from verse.plotter.plotter2D import simulation_tree
 
-from noisyreach import CarAgent, CarMode, Trajectory
+from .car_agent import CarAgent, CarMode
+from .trajectory import Trajectory
 
 AVAIL_SYSTEMS = {"CAR": {"dims": 5, "desc": "Dimensions are: (x, y, theta, v, omega)."}}
+DIMS = {"CAR": 5}
+
+
+def get_max_diam(latency: float, errors: float | list[float], sysname: str):
+    if isinstance(errors, float):
+        errors = [errors] * 5
+    return np.max(deviation(latency, [1 - e for e in errors], system=sysname))
 
 
 def trace_deviation(traces: list[AnalysisTree], agent: CarAgent):
@@ -25,11 +33,21 @@ def trace_deviation(traces: list[AnalysisTree], agent: CarAgent):
 def deviation(
     latency: float,
     accuracy: float | list[float],
-    system="Car",
+    system="CAR",
     num_sims=10,
     plotting=False,
 ):
+    if system == "CAR":
+        return _car_deviation(latency, accuracy, num_sims, plotting)
+    else:
+        raise NotImplementedError(f"Provided system '{system}' is not implemented.")
+
+
+def _car_deviation(
+    latency: float, accuracy: float | list[float], num_sims: int, plotting: bool
+):
     control_period = latency
+
     if isinstance(accuracy, float):
         sensing_errors = [1 - accuracy] * 2 + [0.0, 0.0, 0.0]
     else:
@@ -44,15 +62,15 @@ def deviation(
     time_step = 0.001
 
     # center and error for initial_set = [x, y, theta, v, omega]
-    initial_set_c = (2.0, -1.0, 0, 0.0, 0.0)
-    initial_set_e = (0.2,) * 2 + (0.2,) * 3
+    initial_set_c = (1.0, -0.5, 0, 0.0, 0.0)
+    initial_set_e = (0.1,) * 2 + (0.1,) * 3
 
     traj = Trajectory(
         [
-            ("circle", 15, (2, -1), (2, 1), (2, 0), "counterclockwise"),
-            ("line", 15, (2, 1), (-2, 1)),
-            ("circle", 15, (-2, 1), (-2, -1), (-2, 0), "counterclockwise"),
-            ("line", 15, (-2, -1), (2, -1)),
+            ("circle", 8, (1, -0.5), (1, 0.5), (1, 0), "counterclockwise"),
+            ("line", 8, (1, 0.5), (-1, 0.5)),
+            ("circle", 8, (-1, 0.5), (-1, -0.5), (-1, 0), "counterclockwise"),
+            ("line", 8, (-1, -0.5), (1, -0.5)),
         ]
     )
     time_horizon = traj.total_duration

@@ -104,10 +104,11 @@ class CarAgent(BaseAgent):
 
         # Each control period is solved as a separate IVP problem with the states from last period as the initial value, and control input calculated from this initial value
         state = initial_set
+        u = (0, 0)
         self.traj.reset()
         for i_start, i_end in zip(control_indices[:-1], control_indices[1:]):
             pr, vr = self.traj.get_state(t_eval[i_start])
-            u = CarAgent.tracking_controller(
+            u_next = CarAgent.tracking_controller(
                 t_eval[i_start], self.sensor(state, rng), pr, vr
             )
             y = solve_ivp(
@@ -119,6 +120,7 @@ class CarAgent(BaseAgent):
             ).y
             trace[i_start : i_end + 1, 1:] = y.T
             state = y[:, -1]
+            u = u_next
 
         return trace
 
