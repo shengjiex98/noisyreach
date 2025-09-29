@@ -34,7 +34,7 @@ dev = [
 verse = { workspace = true }
 
 [tool.uv.workspace]
-members = ["packages/*"]
+members = ["deps/*"]
 
 [tool.ruff]
 line-length = 88

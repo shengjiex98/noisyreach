@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.patches import Circle
 from mpl_toolkits.mplot3d import Axes3D
 
 LINE_WIDTH = 1
@@ -88,9 +89,8 @@ def plot_safetube(ax, trace, radius, *, name="safe region", t_dim=0, x_dim=1, y_
             trace[:, y_dim] - radius,
             color="lightblue",
         )
-
         for row in trace:
-            circle = plt.Circle(
+            circle = Circle(
                 (row[x_dim], row[y_dim]),
                 radius,
                 color="lightblue",
