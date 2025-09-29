@@ -1,3 +1,23 @@
+"""Deviation analysis for noisy reachability problems.
+
+This module provides functions to analyze the maximum deviation of autonomous
+agents from their reference trajectories under sensing noise and control delays.
+The analysis is performed through Monte Carlo simulation using the VERSE framework.
+
+The main functionality includes:
+- deviation(): Core function for computing trajectory deviations
+- trace_deviation(): Extract deviation metrics from simulation traces
+- get_max_diam(): Compute maximum diameter of reachable sets
+
+Example:
+    Analyze car agent deviation with 2% latency and 90% sensing accuracy:
+
+    >>> from noisyreach import deviation
+    >>> deviations = deviation(latency=0.02, accuracy=0.9, system="CAR")
+    >>> max_dev = np.max(deviations)
+    >>> print(f"Maximum deviation: {max_dev:.3f} meters")
+"""
+
 import numpy as np
 import plotly.graph_objects as go
 from verse import Scenario, ScenarioConfig
@@ -11,13 +31,47 @@ AVAIL_SYSTEMS = {"CAR": {"dims": 5, "desc": "Dimensions are: (x, y, theta, v, om
 DIMS = {"CAR": 5}
 
 
-def get_max_diam(latency: float, errors: float | list[float], sysname: str):
+def get_max_diam(latency: float, errors: float | list[float], sysname: str) -> float:
+    """Compute maximum diameter of reachable set.
+
+    Calculates the maximum diameter of the reachable set for given latency
+    and sensing errors by converting error rates to accuracy and running
+    deviation analysis.
+
+    Args:
+        latency: Control latency in seconds
+        errors: Sensing error rates (scalar or list)
+        sysname: System name (currently supports "CAR")
+
+    Returns:
+        Maximum diameter of reachable set in meters
+
+    Note:
+        This function converts error rates to accuracy rates (1 - error)
+        before calling the main deviation analysis.
+    """
     if isinstance(errors, float):
         errors = [errors] * 5
     return np.max(deviation(latency, [1 - e for e in errors], system=sysname))
 
 
-def trace_deviation(traces: list[AnalysisTree], agent: CarAgent):
+def trace_deviation(traces: list[AnalysisTree], agent: CarAgent) -> np.ndarray:
+    """Extract position deviations from simulation traces.
+
+    Computes the Euclidean distance between actual agent trajectories and
+    the reference trajectory for each simulation run.
+
+    Args:
+        traces: List of simulation traces from VERSE analysis
+        agent: Car agent containing the reference trajectory
+
+    Returns:
+        Array of maximum deviations (n_simulations,) where each element
+        is the maximum Euclidean distance from reference for that simulation
+
+    Note:
+        Only considers x,y position deviations, ignoring orientation and velocities.
+    """
     traces = np.asarray([trace.root.trace[agent.id] for trace in traces])
     reference_trace = agent.reference_trace(list(traces[0, :, 0]))
 
@@ -33,10 +87,37 @@ def trace_deviation(traces: list[AnalysisTree], agent: CarAgent):
 def deviation(
     latency: float,
     accuracy: float | list[float],
-    system="CAR",
-    num_sims=10,
-    plotting=False,
-):
+    system: str = "CAR",
+    num_sims: int = 10,
+    plotting: bool = False,
+) -> np.ndarray:
+    """Analyze trajectory deviation under sensing noise and control delay.
+
+    Performs Monte Carlo simulation to analyze how sensing noise and control
+    latency affect an agent's ability to follow reference trajectories.
+    Returns the maximum deviations for each simulation run.
+
+    Args:
+        latency: Control update period in seconds (sensor-to-actuator delay)
+        accuracy: Sensing accuracy (0-1) for state measurements.
+            Can be scalar (applied to x,y only) or list of 5 values for
+            [x, y, theta, v, omega]
+        system: System type to analyze (default: "CAR")
+        num_sims: Number of Monte Carlo simulation runs (default: 10)
+        plotting: Whether to show trajectory plots (default: False)
+
+    Returns:
+        Array of maximum deviations (num_sims,) in meters
+
+    Raises:
+        NotImplementedError: If system type is not supported
+        ValueError: If accuracy list has wrong dimensions
+
+    Example:
+        >>> devs = deviation(0.02, 0.9, num_sims=100)
+        >>> print(f"Mean deviation: {np.mean(devs):.3f}m")
+        >>> print(f"95th percentile: {np.percentile(devs, 95):.3f}m")
+    """
     if system == "CAR":
         return _car_deviation(latency, accuracy, num_sims, plotting)
     else:
@@ -45,7 +126,25 @@ def deviation(
 
 def _car_deviation(
     latency: float, accuracy: float | list[float], num_sims: int, plotting: bool
-):
+) -> np.ndarray:
+    """Implementation of deviation analysis for car agents.
+
+    Performs the core simulation and analysis for car agents following
+    a figure-eight reference trajectory with sensing noise and control delays.
+
+    Args:
+        latency: Control update period in seconds
+        accuracy: Sensing accuracy (scalar or 5-element list)
+        num_sims: Number of simulation runs
+        plotting: Whether to display trajectory plots
+
+    Returns:
+        Array of maximum trajectory deviations for each simulation
+
+    Note:
+        The reference trajectory consists of a figure-eight pattern with
+        circular arcs and straight line segments, totaling 32 seconds duration.
+    """
     control_period = latency
 
     if isinstance(accuracy, float):
@@ -57,7 +156,7 @@ def _car_deviation(
             )
         sensing_errors = [1 - a for a in accuracy]
 
-    # >>>>>>>>> Simulation Parameters >>>>>>>>>
+    # Simulation configuration parameters
     SEED = 42
     time_step = 0.001
 
@@ -74,7 +173,7 @@ def _car_deviation(
         ]
     )
     time_horizon = traj.total_duration
-    # <<<<<<<<< Simulation Parameters <<<<<<<<<
+    # End simulation configuration
 
     car1 = CarAgent(
         "car1",

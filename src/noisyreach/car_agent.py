@@ -1,3 +1,18 @@
+"""Car agent implementation for noisy reachability analysis.
+
+This module provides CarAgent, an autonomous car simulation agent that extends
+VERSE's BaseAgent with trajectory tracking capabilities, sensing noise modeling,
+and Dubins car dynamics.
+
+The agent implements a tracking controller based on Kanayama et al.'s stable
+tracking method, with configurable sensing errors and control periods for
+reachability analysis under uncertainty.
+
+Reference:
+    Y. Kanayama, Y. Kimura, F. Miyazaki, and T. Noguchi, "A stable tracking
+    control method for an autonomous mobile robot," IEEE ICRA, 1990.
+"""
+
 from decimal import Decimal
 from pathlib import Path
 
@@ -14,6 +29,18 @@ CAR_DL = Path(__file__).parent.joinpath("car_decision_logic.py")
 
 
 class CarAgent(BaseAgent):
+    """Car agent with trajectory tracking and sensing noise.
+
+    Extends VERSE BaseAgent to provide a realistic car model with:
+    - Dubins car dynamics (position, orientation, velocities)
+    - Trajectory tracking controller with configurable gains
+    - Sensing noise modeling for reachability analysis
+    - Configurable physical constraints (speed, acceleration limits)
+
+    The agent follows reference trajectories while accounting for sensing
+    errors and control delays, making it suitable for safety analysis.
+    """
+
     def __init__(
         self,
         id,
@@ -33,6 +60,27 @@ class CarAgent(BaseAgent):
             [("circle", 10, (1, 0), (-1, 0), (0, 0), "counterclockwise")]
         ),
     ):
+        """Initialize car agent with physical and control parameters.
+
+        Args:
+            id: Unique identifier for this agent
+            code: Custom decision logic code (optional)
+            file_name: Path to decision logic file (default: car_decision_logic.py)
+            initial_state: Initial state vector [x, y, theta, v, omega]
+            initial_mode: Initial discrete mode (default: CarMode.NORMAL)
+            seed: Random seed for deterministic sensing noise
+            max_speed: Maximum linear velocity in m/s
+            max_accel: Maximum linear acceleration in m/s²
+            max_omega: Maximum angular velocity in rad/s
+            max_alpha: Maximum angular acceleration in rad/s²
+            control_period: Control update period in seconds
+            sensing_error_std: Standard deviations for sensing noise (length 5)
+            traj: Reference trajectory to follow
+
+        Note:
+            Physical parameters are based on Kanayama et al. (1990) for stable
+            tracking control of autonomous mobile robots.
+        """
         super().__init__(id, code, file_name, initial_state, initial_mode)
         self.seed = seed
         self.nonce = 0
@@ -44,22 +92,63 @@ class CarAgent(BaseAgent):
         self.sensing_error_std = sensing_error_std
         self.traj = traj
 
-    def sensor(self, state, rng):
+    def sensor(self, state: np.ndarray, rng: np.random.Generator) -> np.ndarray:
+        """Apply sensing noise to state measurements.
+
+        Models multiplicative Gaussian sensing errors affecting each state component.
+        The noise model is: sensed_state = (1 + noise) * true_state where
+        noise ~ N(0, sensing_error_std).
+
+        Args:
+            state: True system state [x, y, theta, v, omega]
+            rng: Random number generator for noise sampling
+
+        Returns:
+            Noisy state measurement with same dimensions as input
+        """
         error = rng.normal(0, self.sensing_error_std)
         return (1 + error) * state
 
-    def dynamics(self, t, state, u):
+    def dynamics(
+        self, t: float, state: list[float], u: tuple[float, float]
+    ) -> list[float]:
+        """Compute system dynamics for Dubins car model.
+
+        Implements the continuous-time dynamics of a car-like vehicle with
+        velocity and angular velocity as control inputs. Physical constraints
+        are applied to maintain realistic motion.
+
+        Args:
+            t: Current time (unused for time-invariant system)
+            state: Current state [x, y, theta, v, omega] where:
+                - x, y: position coordinates in meters
+                - theta: heading angle in radians
+                - v: linear velocity in m/s
+                - omega: angular velocity in rad/s
+            u: Control inputs (v_target, omega_target)
+
+        Returns:
+            State derivatives [x_dot, y_dot, theta_dot, v_dot, omega_dot]
+
+        Note:
+            Control inputs are saturated to respect physical limits for
+            speed, angular velocity, acceleration, and angular acceleration.
+        """
         assert len(state) == 5
         assert len(u) == 2
         x, y, theta, v, omega = state
         v_t, omega_t = u
 
+        # Apply velocity and angular velocity constraints
         v_t = min(self.max_speed, max(0, v_t))
         omega_t = min(self.max_omega, max(-self.max_omega, omega_t))
 
+        # Kinematic equations for car-like vehicle
         x_dot = v_t * np.cos(theta)
         y_dot = v_t * np.sin(theta)
         theta_dot = omega_t
+
+        # Apply acceleration constraints
         v_dot = min(self.max_accel, max(-self.max_accel, v_t - v))
         omega_dot = min(self.max_alpha, max(-self.max_alpha, omega_t))
 
@@ -72,7 +161,29 @@ class CarAgent(BaseAgent):
         time_horizon: float,
         time_step: float,
         map: LaneMap = None,
-    ):
+    ) -> np.ndarray:
+        """Simulate trajectory tracking with control periods.
+
+        Performs closed-loop simulation of the car agent following its reference
+        trajectory with discrete control updates and sensing noise. The simulation
+        accounts for sensor-to-actuator delay by computing control inputs based
+        on measurements from the previous control period.
+
+        Args:
+            mode: Simulation mode (currently unused)
+            initial_set: Initial state vector [x, y, theta, v, omega]
+            time_horizon: Total simulation time in seconds
+            time_step: Simulation integration time step in seconds
+            map: Lane map for decision logic (optional, currently unused)
+
+        Returns:
+            Simulation trace array (n_points, 6) where:
+            - Column 0: time stamps
+            - Columns 1-5: state variables [x, y, theta, v, omega]
+
+        Warning:
+            Issues warning if control_period is not a multiple of time_step
+        """
         # TODO: currently only using Decimal for assert, not integration. Consider using Decimals also for calculation, or other ways to help with precision/rounding errors.
         if Decimal(str(self.control_period)) % Decimal(str(time_step)) != 0:
             print(
@@ -96,7 +207,7 @@ class CarAgent(BaseAgent):
             np.arange(0, t_eval[-1], self.control_period), [t_eval[-1]]
         )
 
-        # Find indecies of timestamps where the practical calculations of control inputs should occur
+        # Find indices of timestamps where the practical calculations of control inputs should occur
         control_indices = np.searchsorted(t_eval, control_instants, "left")
 
         trace = np.zeros((n_points, len(initial_set) + 1))
@@ -169,6 +280,17 @@ class CarAgent(BaseAgent):
         return v_t, omega_t
 
     def reference_trace(self, t_eval: list[float]) -> np.ndarray:
+        """Generate reference trajectory trace for given time points.
+
+        Computes the reference trajectory states at specified time points,
+        useful for comparison with actual agent trajectory or visualization.
+
+        Args:
+            t_eval: List of time points to evaluate
+
+        Returns:
+            Array (n_points, 6) containing [t, x, y, theta, v, omega] for each time point
+        """
         self.traj.reset()
         return np.asarray(
             [
@@ -178,7 +300,19 @@ class CarAgent(BaseAgent):
             ]
         )
 
-    def plot_reference_trace(self, fig: go.Figure, n_points: int = 50):
+    def plot_reference_trace(self, fig: go.Figure, n_points: int = 50) -> go.Figure:
+        """Add reference trajectory visualization to Plotly figure.
+
+        Plots the reference trajectory as arrows showing position and orientation
+        at evenly spaced time points. Arrow size represents velocity magnitude.
+
+        Args:
+            fig: Plotly figure to add traces to
+            n_points: Number of trajectory points to visualize (default: 50)
+
+        Returns:
+            Updated Plotly figure with reference trajectory traces
+        """
         t_eval = np.linspace(0, self.traj.total_duration, n_points)
         reference_trace = self.reference_trace(t_eval)
 
