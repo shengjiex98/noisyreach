@@ -7,31 +7,19 @@ name = "noisyreach"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-authors = [
-    { name = "shengjiex98", email = "shengjiex98@gmail.com" }
-]
-requires-python = ">=3.12"
-dependencies = [
-    "control>=0.10.1",
-    "verse",
-]
+authors = [{ name = "shengjiex98", email = "shengjiex98@gmail.com" }]
+requires-python = ">=3.9"
+dependencies = ["control", "verse"]
 
 [project.optional-dependencies]
-notebook = [
-    "ipykernel>=6.29.5",
-    "nbformat>=5.10.4",
-    "pandas>=2.2.3",
-]
+notebook = ["ipykernel>=6.29.5", "nbformat>=5.10.4", "pandas>=2.2.3"]
 
 [dependency-groups]
-dev = [
-    "pre-commit>=4.1.0",
-    "ruff>=0.9.7",
-]
+dev = ["pre-commit>=4.1.0", "ruff>=0.9.7"]
 
 [tool.uv.sources]
-# verse = { git = "https://github.com/shengjiex98/verse-library" }
-verse = { workspace = true }
+verse = { git = "https://github.com/shengjiex98/verse-library" }
+# verse = { workspace = true }
 
 [tool.uv.workspace]
 members = ["deps/*"]
@@ -40,9 +28,7 @@ members = ["deps/*"]
 line-length = 88
 
 [tool.ruff.lint]
-extend-select = [
-    "I"
-]
+extend-select = ["I"]
 
 [tool.ruff.format]
 docstring-code-format = true
