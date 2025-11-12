@@ -9,7 +9,10 @@ description = "Add your description here"
 readme = "README.md"
 authors = [{ name = "shengjiex98", email = "shengjiex98@gmail.com" }]
 requires-python = ">=3.9"
-dependencies = ["control", "verse"]
+dependencies = [
+    "control",
+    "verse @ git+https://github.com/shengjiex98/verse-library",
+]
 
 [project.optional-dependencies]
 notebook = ["ipykernel>=6.29.5", "nbformat>=5.10.4", "pandas>=2.2.3"]
@@ -18,7 +21,6 @@ notebook = ["ipykernel>=6.29.5", "nbformat>=5.10.4", "pandas>=2.2.3"]
 dev = ["pre-commit>=4.1.0", "ruff>=0.9.7"]
 
 [tool.uv.sources]
-verse = { git = "https://github.com/shengjiex98/verse-library" }
 # verse = { workspace = true }
 
 [tool.uv.workspace]
